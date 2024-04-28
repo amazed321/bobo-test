@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="{% static 'plugins/bootstrap/css/bootstrap.min.css' %}">
+    <style>
+        .box {
+            width: 450px;
+            border: 1px solid #f0f0f0;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 100px;
+
+            padding-left: 40px;
+            padding-right: 40px;
+            padding-bottom: 30px;
+
+            box-shadow: 5px 10px 10px rgb(0 0 0 / 5%);
+        }
+
+        .error-msg {
+            color: red;
+            position: absolute;
+        }
+    </style>
+</head>
+<body>
+<div class="box">
+    <form method="post" id="smsForm">
+        <h2 style="text-align: center;">短信登录</h2>
+        {% csrf_token %}
+
+        {% for field in form %}
+            {% if field.name == 'code' %}
+                <div class="form-group" style="position: relative;margin-bottom: 25px">
+                    <label>{{ field.label }}</label>
+                    <div class="row">
+                        <div class="col-xs-7">
+                            {{ field }}
+                            <span class="error-msg">{{ field.errors.0 }}</span>
+                        </div>
+                        <div class="col-xs-5">
+                            <input id="btnSendSms" type="button" value="点击获取验证码" class="btn btn-default"/>
+                        </div>
+                    </div>
+
+                </div>
+            {% else %}
+                <div class="form-group" style="position: relative;margin-bottom: 25px">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    <span class="error-msg">{{ field.errors.0 }}</span>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <button type="button" class="btn btn-primary" id="btnSubmit">登 录</button>
+        <a href="{% url 'login' %}" style="float: right;">用户名登录</a>
+    </form>
+</div>
+
+
+<script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+<script src="{% static 'js/csrf.js' %}"></script>
+<script>
+    $(function () {
+        //当页面加载完成之后，自动执行
+        bindSendSmsEvent();
+        //bindSubmitEvent();
+        bindSubmitEventCsrfHeader();
+    })
+
+    /**
+     * 绑定点击发送短信的事件
+     */
+    function bindSendSmsEvent() {
+        $("#btnSendSms").click(function () {
+
+            $(".error-msg").empty()
+
+            // 获取手机号 + 发送后台（手机号格式校验 + 限制） + 发送短信 => 发送成功
+            $.ajax({
+                //url:"/send/sms/",
+                url: "{% url 'send_sms' %}",
+                type: "POST",
+                data: {
+                    mobile: $("#id_mobile").val(),
+                    role: $("#id_role").val(),
+                },
+                dataType: "JSON",
+                success: function (res) {
+
+                    if (res.status) {
+                        // 短信发送成功，显示 60秒重新发送  59秒重新发送    0秒重新发送  点击获取验证码
+
+                        $("#btnSendSms").prop("disabled", true);
+                        var time = 10;
+                        var remind = setInterval(function () {
+                            $("#btnSendSms").val(time + "秒重新发送");
+                            time = time - 1;
+                            if (time < 1) {
+                                $("#btnSendSms").val("点击获取验证码");
+                                clearInterval(remind);
+                                $("#btnSendSms").prop("disabled", false);
+                            }
+                        }, 1000);
+
+
+                    } else {
+                        // 发送失败，将错误信息展示页面
+                        $.each(res.msg, function (k, v) {
+                            $("#id_" + k).next().text(v[0]);
+                        })
+                    }
+                }
+            })
+        });
+    }
+
+    function bindSubmitEvent() {
+        $("#btnSubmit").click(function () {
+
+            $(".error-msg").empty()
+
+            $.ajax({
+                //url:"/sms/login/",
+                url: "{% url 'sms_login' %}",
+                type: "POST",
+                data: $("#smsForm").serialize(),
+                dataType: "JSON",
+                success: function (res) {
+                    if (res.status) {
+                        //成功是，自动跳转 res.data = '/home/'
+                        location.href = res.data;
+                    } else {
+                        //失败时，显示错误信息
+                        //console.log(res.msg);
+                        $.each(res.msg, function (k, v) {
+                            $("#id_" + k).next().text(v[0]);
+                        })
+                    }
+                }
+            })
+
+        });
+    }
+
+    function bindSubmitEventCsrfHeader() {
+        $("#btnSubmit").click(function () {
+            $(".error-msg").empty()
+            $.ajax({
+                //url:"/sms/login/",
+                url: "{% url 'sms_login' %}",
+                type: "POST",
+                data: {
+                    role: $("#id_role").val(),
+                    mobile: $("#id_mobile").val(),
+                    code: $("#id_code").val(),
+                },
+                dataType: "JSON",
+                success: function (res) {
+                    if (res.status) {
+                        //成功是，自动跳转 res.data = '/home/'
+                        location.href = res.data;
+                    } else {
+                        //失败时，显示错误信息
+                        //console.log(res.msg);
+                        $.each(res.msg, function (k, v) {
+                            $("#id_" + k).next().text(v[0]);
+                        })
+                    }
+                }
+            })
+        });
+    }
+</script>
+</body>
+</html>
